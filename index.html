@@ -1,0 +1,30 @@
+<html>
+    <body>
+        <textarea cols="200" rows="20" id="datos"></textarea>
+        <input type="button" value="Procesar" id="btProcesar" onclick="doProcesar()"/>
+
+        <script>
+            const PREFIJO = "00000000"
+            function modificaFecha( e ) {
+                var fecha=e[0]
+                if( fecha.substr(0, PREFIJO.length)!=PREFIJO ) {
+                    var f_h=fecha.split(" ")
+                    var f=f_h[0].split( "/" )
+                    e[0]=f[2]+"/"+f[1]+"/"+f[0]+" "+f_h[1]
+                }
+                return( e )
+            }
+            function doProcesar() {
+                // para prevenir que la primera línea se desordene, le añado ___
+                let dd=PREFIJO+datos.value
+                let vector=dd
+                    .split("\n")  // Separo las líneas
+                    .map((e=>(e.split("\t").filter(e=>e!=""))))  // Separo cada uno de los campos y elimino los vacíos
+                    .filter(e=>(e.join("")!="")) // Filtro por las líneas que NO están vacías
+                    .map(e=>modificaFecha(e)) // Pongo bien la fecha para ordenar: aaaa/mm/dd
+                    .sort( (a,b)=>a[0]<b[0]?-1:1)  // Ordeno por fecha
+                console.log( vector )
+            }
+        </script>
+    </body>
+</html>
