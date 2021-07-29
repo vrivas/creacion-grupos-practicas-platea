@@ -118,7 +118,7 @@
         <br/>
         Máx. núm. de estudiantes por grupo: <input type="text" value="25" id="estudiantesPorGrupo" value="25"/>
         <br/>
-        <input type="button" value="Procesar" id="btProcesar" onclick="doProcesar()"/>
+        <input type="button" value="Procesar" id="btProcesar" onclick="btProcesarClick()"/>
         <hr/>
         <div id="consola"></div>
         <script>
@@ -153,17 +153,19 @@
                 this.correo=vector[1]
                 this.eleccion=vector.slice(2).map(e=>isNaN(e*1.0)?e:e*1.0) // Convierto las prioridades en números
                 this.grupoAsignado = null
+                this.opcionAsignada = null
 
                 this.toString=function() {
                     return this.fecha+","
                         + this.correo+","
                         + (this.grupoAsignado+1);
                 }
-                this.toTR=function() {
-                    let msg=["<TR><TD>",this.fecha,"</TD><TD>"
-                        ,this.correo,"</TD><TD>"
-                        , (this.grupoAsignado+1)
-                        ,"</TD></TR>"].join("")
+                this.toTR=function(grupos) {
+                    let msg=["<TR><TD>",this.fecha,"</TD>"
+                        , "<TD>",this.correo,"</TD>"
+                        ,"<TD>", (grupos[this.grupoAsignado]),"</TD>"
+                        ,"<TD>", (this.opcionAsignada),"</TD>"                        
+                        ,"</TR>"].join("")
                     return msg
                 }
             }
@@ -200,18 +202,30 @@
                     .filter( e=> e.grupoAsignado==null )
             }
 
-            function asignaGrupo( peticiones, tamaGrupo, grupo ) {
+            function asignaGrupo( peticiones, tamaGrupo, grupo, prioridad ) {
                 for( let i=0; i<tamaGrupo && i<peticiones.length && ocupacionGrupos[grupo]<tamaGrupo; ++i ) {
                     peticiones[i].grupoAsignado=grupo*1.0
+                    peticiones[i].opcionAsignada=prioridad
                     ++ocupacionGrupos[grupo]
+                }
+            }
+
+            function compruebaSuficientesGrupos(tamaGrupo, numGrupos, numEstudiantes) {
+                if( tamaGrupo*numGrupos<numEstudiantes ) {
+                    let min=Math.ceil( numEstudiantes/numGrupos )
+                    let sobran=numEstudiantes-tamaGrupo*numGrupos
+                    alert( "El número de grupos NO es suficiente para asignar todos los estudiantes. \n"
+                        + "Estudiantes que no se podrán asignar a ningún grupo: "+sobran+". \n"
+                        +"Mínimo grupo de estudiantes necesarios en cada grupo: "+min+"\n")
+                    //return
                 }
             }
 
 
             function doProcesar() {
-                cls()
                 // para prevenir que la primera línea se desordene, le añado ___
                 let dd=PREFIJO+datos.value
+                let tamaGrupo = estudiantesPorGrupo.value*1.0
                 preferencias=dd
                     .split("\n")  // Separo las líneas
                     .map((e=>(e.split("\t")
@@ -220,33 +234,26 @@
                     .filter(e=>(e.join("")!="")) // Filtro por las líneas que NO están vacías
                     .map(e=>modificaFecha(e)) // Pongo bien la fecha para ordenar: aaaa/mm/dd
                     .map( e=>new Preferencia(e)) // Creo un objeto con cada línea    
-                console.log( "Inicialmente hay "+preferencias.length )
+                let lineasLeidas = preferencias.length-1
                 preferencias=preferencias.sort(ordenarCorreoFechaInversa)
                 preferencias=eliminaCorreosRepetidos( preferencias )  
                 preferencias=preferencias.sort(ordenarFecha)
                 grupos=preferencias[0].eleccion
                 preferencias.splice(0,1)
-                console.log( "Al final hay "+preferencias.length )           
-                console.log( preferencias )
+                //console.log( "Al final hay "+preferencias.length )           
+                //console.log( preferencias )
 
-                tamaGrupo = estudiantesPorGrupo.value*1.0
-                numGrupos = grupos.length 
-                numEstudiantes = preferencias.length
+                let numGrupos = grupos.length 
+                let numEstudiantes = preferencias.length
                 ocupacionGrupos = new Array(numGrupos)
                 ocupacionGrupos.fill(0,0,numGrupos)
-                writeln( "Núm estudiantes: "+preferencias.length )
+                writeln( "Núm. respuestas: "+lineasLeidas )
+                writeln( "Núm. estudiantes (tras quitar repetidos): "+preferencias.length )
                 writeln( "Núm. grupos: "+grupos.length )
                 grupos.forEach(e=>writeln(" - "+e));
                 writeln( "Máx. núm. estudiantes por grupo: "+tamaGrupo )
 
-                if( tamaGrupo*numGrupos<numEstudiantes ) {
-                    let min=Math.round( numEstudiantes/numGrupos )
-                    let sobran=numEstudiantes-tamaGrupo*numGrupos
-                    alert( "El número de grupos NO es suficiente para asignar todos los estudiantes. \n"
-                        + "Estudiantes no se podrán asignar a ningún grupo: "+sobran+". \n"
-                        +"Mínimo grupo de estudiantes necesarios en cada grupo: "+min+"\n")
-                    //return
-                }
+                compruebaSuficientesGrupos( tamaGrupo, numGrupos, numEstudiantes )
                 let grupo = 0
                 let prioridad = 1
                 peticiones = []
@@ -262,20 +269,20 @@
                     //writeln( "Para prioridad "+prioridad )
                     for( grupo in grupos ) {
                         peticiones = calculaPeticionesRestantesGrupoPrioridad( preferencias, grupo, prioridad )
-                        asignaGrupo( peticiones, tamaGrupo, grupo )
+                        asignaGrupo( peticiones, tamaGrupo, grupo, prioridad )
                         //writeln( "Núm. estudiantes en Grupo "+grupos[grupo]+ ": "+peticiones.length )
                     }
                 }
 
                 write( "<h3>Asignaciones por prioridad</h3>" );
                 for( prioridad=1; prioridad<=grupos.length; ++prioridad ) {
-                    numEstudiantes=preferencias.filter(e=>e.eleccion[e.grupoAsignado]==prioridad).length
-                    writeln( "Estudiantes asignados a su prioridad "+prioridad+": "+numEstudiantes )
+                    let tmpEstudiantes=preferencias.filter(e=>e.eleccion[e.grupoAsignado]==prioridad).length
+                    writeln( "Estudiantes asignados a su prioridad "+prioridad+": "+tmpEstudiantes+ " ("+((100*tmpEstudiantes)/numEstudiantes).toFixed(2)+"%)" )
                 }
                 write( "<h3>Asignaciones por grupo</h3>" );
                 for( grupo=0; grupo<grupos.length; ++grupo ) {
-                    numEstudiantes=preferencias.filter(e=>e.grupoAsignado==grupo).length
-                    writeln( "Estudiantes asignados en el grupo "+(grupo+1)+": "+numEstudiantes )
+                    let tmpEstudiantes=preferencias.filter(e=>e.grupoAsignado==grupo).length
+                    writeln( "Estudiantes asignados en el grupo "+(grupo+1)+": "+tmpEstudiantes )
                 }
 
                 
@@ -283,11 +290,11 @@
                 write( "<h3>Listados por Grupo</h3>" );
                 for( grupo=0; grupo<grupos.length; ++grupo ) {
                     estudiantes=preferencias.filter(e=>e.grupoAsignado==grupo)
-                    write( "<h4>"+(grupo+1)+". "+grupos[grupo]+"<h4>")
+                    write( "<h4>"+(grupo+1)+". "+grupos[grupo]+": "+estudiantes.length+" estudiantes <h4>")
                     let msg="<table border='1' width='80%'>\
-                            <thead><th>Fecha</th><th>Email</th><th>Grupo</th><thead>\
+                            <thead><th>Fecha</th><th>Email</th><th>Grupo</th><th>Preferencia</th><thead>\
                             <tbody>"
-                        +estudiantes.map(e=>e.toTR()).join("")
+                        +estudiantes.map(e=>e.toTR(grupos)).join("")
                         +"</tbody></table>"
                     write( msg )
                 }
@@ -295,6 +302,11 @@
                 numEstudiantes=preferencias.filter(e=>e.grupoAsignado==null).length
                 write( "<h3>Núm. estudiantes sin asignar: "+numEstudiantes+"</h3>" );
 
+            }
+
+            function btProcesarClick() {
+                cls()
+                setTimeout("doProcesar()", 500)
             }
         </script>
     </body>
